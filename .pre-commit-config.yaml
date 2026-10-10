@@ -1,0 +1,20 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      # Prevents accidental commits of private keys or AWS credentials
+      - id: detect-private-key
+
+  - repo: local
+    hooks:
+      - id: block-api-keys
+        name: Block Accidental Nebius & Tavily API Key Commits
+        entry: bash -c 'grep -rEi "nvapi-[a-zA-Z0-9]{30,}|tvly-[a-zA-Z0-9]{30,}" . --exclude-dir={.git,docs} && echo "ERROR: Live API key detected!" && exit 1 || exit 0'
+        language: system
+        stages: [commit]

@@ -1,0 +1,30 @@
+# ==============================================================================
+# Git Attributes - Agent Firewall
+# Normalizes line endings across Windows (CRLF), Linux (LF), and macOS (LF).
+# Prevents false multi-line merge conflicts when different OSes edit the same files.
+# ==============================================================================
+
+# Auto-detect text files and normalize to LF in Git storage
+* text=auto eol=lf
+
+# Explicit syntax overrides
+*.py text diff=python eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.txt text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=crlf
+
+# Binary assets (never touch line endings)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.pdf binary
+*.ico binary
+*.zip binary

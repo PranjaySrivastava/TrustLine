@@ -1,0 +1,27 @@
+# ==============================================================================
+# CODEOWNERS - AGENT FIREWALL REPOSITORY
+# Enforces directory ownership to prevent team merge conflicts.
+# The Team Leader (@Pranjay) retains global ownership over all files.
+# ==============================================================================
+
+# Global fallback: Pranjay (Leader) has access to everything
+* @Pranjay
+
+# Security & Core Gateway (Owned by Pranjay)
+/gateway/ @Pranjay
+/adapters/ @Pranjay
+/.github/ @Pranjay
+/SECURITY.md @Pranjay
+/LICENSE @Pranjay
+
+# AI Intelligence & Evaluation Benchmark (Owned by Soham; Pranjay oversight)
+/intelligence/ @soham @Pranjay
+/benchmark/ @soham @Pranjay
+/tests/aiml/ @soham @Pranjay
+
+# Frontend Developer Console & Dashboard (Owned by Yajas; Pranjay oversight)
+/dashboard/ @yajas @Pranjay
+/tests/frontend/ @yajas @Pranjay
+
+# Shared Backend Tests (Owned by Pranjay & Soham)
+/tests/backend/ @Pranjay @soham

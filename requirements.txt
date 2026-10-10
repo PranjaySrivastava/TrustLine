@@ -1,0 +1,7 @@
+# ==============================================================================
+# Agent Firewall - Master Dependencies
+# Split into modular files to prevent team merge conflicts.
+# ==============================================================================
+-r requirements/base.txt
+-r requirements/ai.txt
+-r requirements/dev.txt

@@ -1,0 +1,27 @@
+# ==============================================================================
+# Auto Assign Configuration (.github/auto-assign.yml)
+# Assigns 1 team reviewer to incoming PRs (excluding the PR author).
+# Used by .github/workflows/auto-assign-reviewers.yml
+# ==============================================================================
+
+# Set to true to add reviewers to pull requests
+addReviewers: true
+
+# Set to false so the reviewer isn't also marked as assignee
+addAssignees: false
+
+# List of team reviewers to pick from
+reviewers:
+  - Pranjay
+  - soham
+  - yajas
+
+# Number of reviewers to add (rule: approved by any 1 team member)
+numberOfReviewers: 1
+
+# Filter by keywords to skip draft PRs
+skipKeywords:
+  - "[wip]"
+  - "[draft]"
+  - "WIP:"
+  - "Draft:"
