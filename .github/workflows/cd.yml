@@ -19,37 +19,43 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            requirements/*.txt
 
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install pytest pytest-asyncio
+          pip install -r requirements.txt
 
       - name: Validate Integrity & Compilation
         run: |
-          echo "Validating system integrity on main branch..."
-          python -m compileall .
+          echo "Validating system integrity across application packages..."
+          python -m compileall gateway adapters intelligence benchmark tests
 
       - name: Run Full Regression Suite
         env:
+          NEBIUS_API_KEY: "mock_nebius_key"
+          TAVILY_API_KEY: "mock_tavily_key"
           FIREWALL_ENV: "production_verification"
+          FAIL_CLOSED: "true"
         run: |
           if [ -d "tests" ]; then
-            pytest tests/ --maxfail=1
+            pytest tests/ -v
           fi
 
       - name: Verify Dashboard Assets
         run: |
-          echo "Verifying dashboard assets exist and are syntactically valid..."
-          if [ -f "dashboard/index.html" ]; then
-            echo "Dashboard entrypoint verified."
-          fi
+          echo "Verifying dashboard assets exist and are valid..."
+          test -f dashboard/index.html || exit 1
+          echo "Dashboard entrypoint verified."
 
-      - name: Deployment / Build Status Summary
+      - name: Deployment Status Summary
         run: |
-          echo "### 🚀 Agent Firewall Deployment Status" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch:** \`main\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Integrity Check:** Passed ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status:** Ready for Hackathon Judging & Live Demonstration." >> $GITHUB_STEP_SUMMARY
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          ### 🚀 TrustLine Deployment Status
+          - **Branch:** `main`
+          - **Commit:** ${{ github.sha }}
+          - **Integrity Check:** Passed ✅
+          - **Status:** Production Build Verified. Ready for Hackathon Demonstration.
+          EOF

@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Detect Merge Conflicts
-        uses: eps1lon/actions-label-merge-conflicts@v3
+        uses: eps1lon/actions-label-merge-conflict@v3
         with:
           dirtyLabel: "has-conflicts"
           repoToken: "${{ secrets.GITHUB_TOKEN }}"
