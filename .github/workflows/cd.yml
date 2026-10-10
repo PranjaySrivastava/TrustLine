@@ -19,9 +19,6 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-          cache-dependency-path: |
-            requirements.txt
-            requirements/*.txt
 
       - name: Install Dependencies
         run: |
@@ -40,9 +37,7 @@ jobs:
           FIREWALL_ENV: "production_verification"
           FAIL_CLOSED: "true"
         run: |
-          if [ -d "tests" ]; then
-            pytest tests/ -v
-          fi
+          pytest tests/ -v
 
       - name: Verify Dashboard Assets
         run: |
@@ -52,10 +47,8 @@ jobs:
 
       - name: Deployment Status Summary
         run: |
-          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
-          ### 🚀 TrustLine Deployment Status
-          - **Branch:** `main`
-          - **Commit:** ${{ github.sha }}
-          - **Integrity Check:** Passed ✅
-          - **Status:** Production Build Verified. Ready for Hackathon Demonstration.
-          EOF
+          echo "### 🚀 TrustLine Deployment Status" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branch: main" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Integrity Check: Passed ✅" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Status: Production Build Verified. Ready for Hackathon Demonstration." >> "$GITHUB_STEP_SUMMARY"
