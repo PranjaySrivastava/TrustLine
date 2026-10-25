@@ -46,3 +46,5 @@ Thumbs.db
 .coverage
 htmlcov/
 *.log
+logs/
+scratch/
