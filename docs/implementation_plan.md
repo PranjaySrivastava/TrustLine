@@ -121,10 +121,11 @@ Day 3: Benchmarking, Video Recording & Devpost Submission
   * `class PolicyEngine`:
     * `evaluate(tool_call: ToolCallRequest, session_state: TaintState) -> PolicyDecision`:
       * **Gate 1 (Scope):** Path must be within active project directory (`cwd`). Block `~/.ssh`, `~/.aws`, `.env`, `/etc/shadow`.
+      * **Gate 1.5 (Drop-and-Execute Defense):** Inspect file write operations for weaponized code, reverse shells, and exfiltration sinks (`RULE_WEAPONIZED_WRITE_BLOCKED`). Track newly authored executable scripts in tainted file registry.
       * **Gate 2 (Canary Egress):** Check all arguments for canary secrets and credential patterns via `CanaryInspector`.
-      * **Gate 3 (Taint Escalation):** If `TAINTED` and tool is privileged, return `Decision.ASK`.
+      * **Gate 3 (Taint & Script Provenance Escalation):** If `TAINTED` and tool is privileged, or attempts to run an agent-authored script from a tainted session, return `Decision.ASK` (`RULE_DROP_AND_EXECUTE_ESCALATION`).
       * **Gate 4 (Fail-Closed):** If any unhandled exception occurs, return `Decision.DENY` with reason `"Gateway unavailable (fail closed)"`.
-* **Unit Tests:** `tests/backend/test_policy_engine.py` (verifies zero path escapes and fail-closed behavior).
+* **Unit Tests:** `tests/backend/test_policy_engine.py` & `tests/backend/test_drop_and_execute.py` (verifies zero path escapes, weaponized write blocking, and staged execution escalation).
 
 #### 1.4 `adapters/claude_code_hook.py`
 * **Purpose:** Official Stdio hook adapter for Claude Code CLI.

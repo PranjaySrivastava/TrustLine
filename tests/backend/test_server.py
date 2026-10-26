@@ -69,6 +69,12 @@ def test_api_simulation_scenarios(client):
     assert r4.status_code == 200
     assert r4.json()["decision"] == "ask"
 
+    # Drop-and-Execute simulation -> deny
+    r5 = client.post("/api/simulate", json={"scenario": "drop_execute"})
+    assert r5.status_code == 200
+    assert r5.json()["decision"] == "deny"
+    assert r5.json()["ruleTriggered"] == "RULE_WEAPONIZED_WRITE_BLOCKED"
+
 
 def test_api_confirm_endpoint(client):
     resp = client.post("/api/confirm", json={"eventId": "evt_test_1", "decision": "allow"})

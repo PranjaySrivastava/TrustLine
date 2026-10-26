@@ -89,6 +89,11 @@ Agent Firewall pairs **probabilistic AI intelligence** (powered by **NVIDIA Nemo
 * Visual indicators for session taint level, Nemotron confidence score breakdown, Tavily domain vetting status, and blocked leak alerts.
 * Interactive Attack Playground & Benchmark comparison tab showing live before/after protection metrics.
 
+### Feature 7: Drop-and-Execute (Staged Payload) Defense
+* **Weaponized Write Inspection:** Analyzes tool-use file writing operations (`WriteFile`, `EditFile`, bash redirection) to detect weaponized backdoors, reverse shell patterns, and outbound webhook sinks before code can be dropped to disk.
+* **Script Provenance Tracking:** Dynamically registers executable scripts (`.py`, `.sh`, `.js`, `.ps1`) authored or modified by the agent while in a `TAINTED` state.
+* **Execution Escalation:** Automatically intercepts any subsequent terminal execution of agent-authored scripts during a tainted session, escalating the command to explicit human approval (`ASK`).
+
 ---
 
 ## 5. Non-Functional Requirements

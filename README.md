@@ -83,6 +83,7 @@ flowchart TD
 * **NVIDIA Nemotron (via Nebius Token Factory):** **Nemotron Nano** screens tool inputs in sub-200ms; **Nemotron Super** reviews borderline threats.
 * **Tavily Security Shield:** **Tavily Extract** sanitizes web pages into clean markdown (eliminating raw HTML payload trickery); **Tavily Search** flags disposable webhook sinks (`webhook.site`).
 * **Deterministic Canary & Egress Blocker:** The ultimate safety net. Even if a zero-day injection bypasses the AI classifier, outgoing arguments are scanned for canary secrets across plaintext, Hex, and Base64—**blocking exfiltration cold**.
+* **Drop-and-Execute (Staged Payload) Defense:** Prevents agents from dropping malicious scripts (`.py`, `.sh`, `.js`) containing reverse shells or exfiltration webhooks to disk, and tracks script provenance to intercept and hold execution of agent-authored code for human approval (`ASK`).
 * **Session Taint Tracking:** Ingesting external content marks the session `TAINTED`, escalating subsequent pushes or network calls to user confirmation.
 
 ---

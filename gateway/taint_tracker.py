@@ -12,7 +12,8 @@ Enforces human-in-the-loop escalation (ASK) for privileged or egress actions whe
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
 
 
 class TaintState(str, Enum):
@@ -82,12 +83,27 @@ class SessionTaintTracker:
         "terminal",
     }
 
+    EXECUTABLE_EXTENSIONS = {
+        ".py",
+        ".sh",
+        ".bash",
+        ".js",
+        ".ts",
+        ".bat",
+        ".ps1",
+        ".cmd",
+        ".rb",
+        ".php",
+        ".vbs",
+    }
+
     VIOLATION_THRESHOLD_FOR_LOCK = 3
 
     def __init__(self):
         self._states: Dict[str, TaintState] = {}
         self._history: Dict[str, List[TaintRecord]] = {}
         self._violations: Dict[str, int] = {}
+        self._tainted_files: Dict[str, Set[str]] = {}
 
     def get_state(self, session_id: str = "default") -> TaintState:
         """Returns the current taint state for a session, default CLEAN."""
@@ -153,6 +169,41 @@ class SessionTaintTracker:
         """Explicitly sets session state (e.g., following manual admin unlock)."""
         self._states[session_id] = state
 
+    def record_file_write(self, session_id: str, file_path: str) -> None:
+        """
+        Records a file authored or modified by the agent.
+        If the session is currently TAINTED or LOCKED and the file is an executable script,
+        it is marked as a tainted authored script.
+        """
+        if not file_path:
+            return
+        state = self.get_state(session_id)
+        if state in {TaintState.TAINTED, TaintState.LOCKED}:
+            try:
+                p = Path(file_path)
+                normalized = p.name.lower()
+                ext = p.suffix.lower()
+                if ext in self.EXECUTABLE_EXTENSIONS or normalized in {"makefile", "dockerfile"}:
+                    if session_id not in self._tainted_files:
+                        self._tainted_files[session_id] = set()
+                    self._tainted_files[session_id].add(normalized)
+                    self._tainted_files[session_id].add(str(file_path).lower())
+            except Exception:
+                pass
+
+    def is_file_tainted(self, session_id: str, file_path: str) -> bool:
+        """Checks if a file was authored while the session was tainted."""
+        if session_id not in self._tainted_files:
+            return False
+        try:
+            normalized = Path(file_path).name.lower()
+            return (
+                normalized in self._tainted_files[session_id]
+                or str(file_path).lower() in self._tainted_files[session_id]
+            )
+        except Exception:
+            return False
+
     def requires_confirmation(
         self,
         session_id: str,
@@ -161,6 +212,7 @@ class SessionTaintTracker:
     ) -> bool:
         """
         Determines whether the proposed tool call requires human-in-the-loop confirmation.
+        Now includes Drop-and-Execute defense: executing agent-authored scripts after taint.
         """
         state = self.get_state(session_id)
         if state == TaintState.CLEAN:
@@ -170,8 +222,18 @@ class SessionTaintTracker:
             # Locked sessions require confirmation or denial for all privileged calls
             return True
 
-        # State is TAINTED: check tool name and arguments for privileged actions
         normalized_tool = tool_name.strip().lower()
+
+        # Drop-and-Execute Guard: Check if command attempts to run a script authored during taint
+        if session_id in self._tainted_files and normalized_tool in {"bash", "terminal", "execute_shell"}:
+            command = ""
+            if tool_input and isinstance(tool_input, dict):
+                command = str(tool_input.get("command", "")).lower()
+            for tainted_script in self._tainted_files[session_id]:
+                if tainted_script in command:
+                    return True
+
+        # State is TAINTED: check tool name and arguments for privileged actions
         if normalized_tool in self.PRIVILEGED_TOOLS:
             # If tool is generic bash/shell, inspect the actual command line
             if normalized_tool in {"bash", "terminal", "execute_shell"}:
@@ -196,3 +258,4 @@ class SessionTaintTracker:
         self._states[session_id] = TaintState.CLEAN
         self._history[session_id] = []
         self._violations[session_id] = 0
+        self._tainted_files[session_id] = set()
