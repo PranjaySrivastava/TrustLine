@@ -13,7 +13,11 @@ jobs:
     name: Auto-assign 1 Team Reviewer
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Auto-assign Reviewer
         uses: kentaro-m/auto-assign-action@v2
+        continue-on-error: true
         with:
           configuration-path: ".github/auto-assign.yml"
