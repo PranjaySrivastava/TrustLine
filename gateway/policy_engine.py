@@ -72,6 +72,23 @@ class PolicyEngine:
         re.compile(r"[A-Za-z]:[\/\\]Windows[\/\\]System32", re.IGNORECASE),
     ]
 
+    WRITE_TOOLS = {
+        "writefile",
+        "write_to_file",
+        "editfile",
+        "replace_file_content",
+        "multi_replace_file_content",
+        "create_file",
+        "append_to_file",
+    }
+
+    # Patterns indicating weaponized payloads dropped into scripts for subsequent execution
+    WEAPONIZED_WRITE_PATTERNS = [
+        re.compile(r"https?:\/\/(?:[a-zA-Z0-9_-]+\.)?(?:webhook\.site|requestbin\.(?:net|com)|pipedream\.net|hookdeck|ngrok-free\.app)", re.IGNORECASE),
+        re.compile(r"(?:open|cat|read)\s*\([^)]*(?:\.ssh|\.aws|\.env|id_rsa|id_ed25519)", re.IGNORECASE),
+        re.compile(r"(?:\.connect\s*\(\s*\(|socket\.socket|nc\s+-e|bash\s+-i|\/dev\/tcp\/|subprocess\.(?:call|Popen)\([^)]*['\"](?:\/bin\/(?:sh|bash)|powershell|cmd))", re.IGNORECASE),
+    ]
+
     def __init__(
         self,
         canary_inspector: Optional[CanaryInspector] = None,
@@ -125,6 +142,24 @@ class PolicyEngine:
             )
 
         # ======================================================================
+        # GATE 1.5: Drop-and-Execute Weaponized Write Guard (Deterministic)
+        # ======================================================================
+        weaponized_violation = self._check_weaponized_write(tool_name, tool_input)
+        if weaponized_violation:
+            self.taint_tracker.mark_violation(session_id, reason=weaponized_violation)
+            return PolicyVerdict(
+                decision=Decision.DENY,
+                reason=f"TrustLine Drop-and-Execute Defense: {weaponized_violation}",
+                rule_triggered="RULE_WEAPONIZED_WRITE_BLOCKED",
+                details={"violation": weaponized_violation},
+            )
+
+        # Track file provenance if agent writes/creates a script
+        target_file = self._extract_target_file(tool_name, tool_input)
+        if target_file:
+            self.taint_tracker.record_file_write(session_id, target_file)
+
+        # ======================================================================
         # GATE 2: Canary Secret & Multi-Encoding Scanner (Deterministic)
         # ======================================================================
         scan_res = self.canary_inspector.scan_payload(tool_input)
@@ -143,19 +178,38 @@ class PolicyEngine:
             )
 
         # ======================================================================
-        # GATE 3: Session Taint Escalation Check
+        # GATE 3: Session Taint Escalation & Drop-and-Execute Execution Check
         # ======================================================================
         if self.taint_tracker.requires_confirmation(session_id, tool_name, tool_input):
-            return PolicyVerdict(
-                decision=Decision.ASK,
-                reason=(
+            command = str(tool_input.get("command", "")).lower() if isinstance(tool_input, dict) else ""
+            tainted_script_match = None
+            if session_id in getattr(self.taint_tracker, "_tainted_files", {}):
+                for script in self.taint_tracker._tainted_files[session_id]:
+                    if script in command:
+                        tainted_script_match = script
+                        break
+
+            if tainted_script_match:
+                reason = (
+                    f"Drop-and-Execute Defense: Agent attempted to run '{tainted_script_match}', "
+                    f"which was authored after session '{session_id}' was TAINTED by unverified content."
+                )
+                rule = "RULE_DROP_AND_EXECUTE_ESCALATION"
+            else:
+                reason = (
                     f"Privileged action '{tool_name}' requires human approval because "
                     f"session '{session_id}' is in {self.taint_tracker.get_state(session_id).value} state."
-                ),
-                rule_triggered="RULE_TAINT_ESCALATION",
+                )
+                rule = "RULE_TAINT_ESCALATION"
+
+            return PolicyVerdict(
+                decision=Decision.ASK,
+                reason=reason,
+                rule_triggered=rule,
                 details={
                     "taint_state": self.taint_tracker.get_state(session_id).value,
                     "history_count": len(self.taint_tracker.get_history(session_id)),
+                    "tainted_script": tainted_script_match,
                 },
             )
 
@@ -261,4 +315,57 @@ class PolicyEngine:
                 # Advisory AI failure does not block benign execution unless sensitive
                 pass
 
+        return None
+
+    def _check_weaponized_write(self, tool_name: str, tool_input: Dict[str, Any]) -> Optional[str]:
+        """
+        Inspects content being written to files or piped via bash output redirection.
+        Blocks weaponized exfiltration logic (webhooks, reverse shells, key dumping)
+        before malicious scripts can be dropped to disk.
+        """
+        normalized_tool = tool_name.strip().lower()
+        content_candidates: List[str] = []
+
+        # 1. Direct file write tools
+        if normalized_tool in self.WRITE_TOOLS:
+            for k in ["content", "code_content", "replacement_content", "text", "replacementContent", "CodeContent"]:
+                val = tool_input.get(k)
+                if isinstance(val, str):
+                    content_candidates.append(val)
+            # Handle ReplacementChunks array if present
+            chunks = tool_input.get("ReplacementChunks") or tool_input.get("replacement_chunks")
+            if isinstance(chunks, list):
+                for chunk in chunks:
+                    if isinstance(chunk, dict) and "ReplacementContent" in chunk:
+                        content_candidates.append(str(chunk["ReplacementContent"]))
+
+        # 2. Bash / Terminal commands containing script output redirection (> or >>)
+        elif normalized_tool in {"bash", "terminal", "execute_shell"}:
+            cmd = str(tool_input.get("command", ""))
+            if ">" in cmd:
+                content_candidates.append(cmd)
+
+        for content in content_candidates:
+            for pattern in self.WEAPONIZED_WRITE_PATTERNS:
+                if pattern.search(content):
+                    return f"Authoring weaponized exfiltration / backdoor code is blocked: '{pattern.pattern}'"
+
+        return None
+
+    def _extract_target_file(self, tool_name: str, tool_input: Dict[str, Any]) -> Optional[str]:
+        """Extracts the target file path if the tool call creates or modifies a file."""
+        normalized_tool = tool_name.strip().lower()
+        if normalized_tool in self.WRITE_TOOLS:
+            for k in ["target_file", "TargetFile", "file_path", "path", "filePath"]:
+                val = tool_input.get(k)
+                if val and isinstance(val, str):
+                    return val
+        elif normalized_tool in {"bash", "terminal", "execute_shell"}:
+            cmd = str(tool_input.get("command", ""))
+            # Check for redirect: e.g. echo "..." > script.py
+            if ">" in cmd:
+                parts = cmd.split(">")
+                if len(parts) >= 2:
+                    target_candidate = parts[-1].strip().split()[0].strip("\"'")
+                    return target_candidate
         return None

@@ -32,6 +32,7 @@ Malicious content can steer the agent via **Indirect Prompt Injection** to steal
 * **Probabilistic AI models will eventually miss novel injections.** Therefore, AI detection (Nemotron) is an early warning system, **not** the only lock on the door.
 * **Deterministic Policy Engine:** Fails closed. Restricts agent strictly to the project workspace directory.
 * **Canary & Secret Scanner:** Blocks any attempt to transmit canary tokens or credentials outside the machine—even if the LLM classifier completely missed the prompt injection.
+* **Drop-and-Execute Defense:** Blocks weaponized script writing and tracks script provenance so executing agent-authored scripts during a tainted session triggers human confirmation (`ASK`).
 * **Session Taint Tracker:** Remembers if untrusted external content was ingested during the session and forces human approval (`ASK`) on subsequent push/network actions.
 
 ---

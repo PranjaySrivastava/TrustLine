@@ -120,21 +120,27 @@ The gateway evaluates tool calls through four sequential gates:
    * Forbidden Paths: `~/.ssh/*`, `~/.aws/*`, `~/.gnupg/*`, `~/.bash_history`, `**/.env*`, `C:\Windows\*`, `/etc/*`.
    * Action: Immediate `DENY`.
 
-2. **Gate 2: Canary & Secret Scanner (Deterministic)**
+2. **Gate 1.5: Drop-and-Execute & Weaponized Write Guard (Deterministic)**
+   * Scans content of file write calls (`WriteFile`, `edit_file`, output redirection) for weaponized exfiltration sinks (`webhook.site`, `requestbin`, `pipedream`) and reverse shells.
+   * Action: Immediate `DENY` (`RULE_WEAPONIZED_WRITE_BLOCKED`).
+   * Provenance Registration: If allowed script authoring occurs during `TAINTED` state, registers file in `_tainted_files`.
+
+3. **Gate 2: Canary & Secret Scanner (Deterministic)**
    * Scans all tool arguments and stdout/stdin for:
      * Known synthetic canary tokens (`CANARY-FIREWALL-SECRET-[A-Za-z0-9]+`).
      * Regex patterns for AWS Access Keys (`AKIA[0-9A-Z]{16}`), GitHub PATs (`ghp_[A-Za-z0-9]{36}`), Private Keys (`-----BEGIN (RSA|OPENSSH) PRIVATE KEY-----`).
      * Automatically decodes Base64 and Hex substrings prior to pattern matching.
    * Action: Immediate `DENY` with Canary Egress alert.
 
-3. **Gate 3: Session Taint State Machine**
+4. **Gate 3: Session Taint State Machine & Script Execution Escalation**
    * State transitions:
      * `CLEAN` $\to$ `TAINTED`: Triggered when agent reads external GitHub issues, web pages, or files outside verified base commits.
    * While `TAINTED`:
      * Read actions: Allowed within scope.
      * Privileged actions (`git push`, `rm -rf`, outbound HTTP POST): Forced to `ASK` (User Confirmation Required) or `DENY`.
+     * **Drop-and-Execute Defense:** Any attempt to execute an agent-authored script (`python staged.py`, `./run.sh`) that was written during a tainted session is intercepted and escalated to `ASK` (`RULE_DROP_AND_EXECUTE_ESCALATION`).
 
-4. **Gate 4: AI & Threat Intelligence (Advisory)**
+5. **Gate 4: AI & Threat Intelligence (Advisory)**
    * Calls Nemotron Nano on Nebius Token Factory.
    * If `confidence >= 0.70` and `is_injection == true`: Mark session `TAINTED`, return `DENY` or `ASK`.
    * If `0.40 <= confidence < 0.70`: Escalate to Nemotron Super.
